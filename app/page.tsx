@@ -96,12 +96,40 @@ export default function Home() {
   const handleCopy = async (textToCopy: string) => {
     if (!textToCopy) return;
 
-    try {
-      await navigator.clipboard.writeText(textToCopy);
+    let copiedSuccessfully = false;
+
+    // 1. Try modern Clipboard API (supported on HTTPS & localhost)
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        copiedSuccessfully = true;
+      } catch (err) {
+        console.warn("navigator.clipboard failed, attempting fallback:", err);
+      }
+    }
+
+    // 2. Fallback for HTTP / non-secure contexts (e.g., direct EC2 IP over HTTP)
+    if (!copiedSuccessfully && typeof document !== "undefined") {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = textToCopy;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-999999px";
+        textarea.style.top = "-999999px";
+        textarea.setAttribute("readonly", "");
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        copiedSuccessfully = document.execCommand("copy");
+        document.body.removeChild(textarea);
+      } catch (err) {
+        console.error("ExecCommand copy fallback failed:", err);
+      }
+    }
+
+    if (copiedSuccessfully) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Ignore
     }
   };
 
