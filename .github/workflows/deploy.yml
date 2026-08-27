@@ -1,0 +1,47 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            -t asanka2002/cloud-url-shortener-frontend:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push asanka2002/cloud-url-shortener-frontend:latest
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo docker pull asanka2002/cloud-url-shortener-frontend:latest
+
+            sudo docker stop cloud-url-shortener-frontend || true
+            sudo docker rm cloud-url-shortener-frontend || true
+
+            sudo docker run -d \
+              --name cloud-url-shortener-frontend \
+              -p 3000:3000 \
+              asanka2002/cloud-url-shortener-frontend:latest
